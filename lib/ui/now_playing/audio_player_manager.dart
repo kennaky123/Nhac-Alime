@@ -86,6 +86,11 @@ class AudioPlayerManager {
     player.play(); // Tự động phát khi lùi bài
   }
 
+  void stopMusic() {
+    player.stop();
+    currentSongNotifier.value = null;
+  }
+
   void dispose(){
     player.dispose();
   }

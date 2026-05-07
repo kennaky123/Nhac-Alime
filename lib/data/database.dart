@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 class AppDatabase {
   static final AppDatabase instance = AppDatabase._init();
@@ -15,14 +17,25 @@ class AppDatabase {
   }
 
   Future<Database> _initDB(String filePath) async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, filePath);
+    if (kIsWeb) {
+      // Cấu hình cho Web
+      databaseFactory = databaseFactoryFfiWeb;
+      return await openDatabase(
+        filePath, // Trên web không cần join(dbPath, filePath)
+        version: 1,
+        onCreate: _createDB,
+      );
+    } else {
+      // Cấu hình cho Mobile (Android/iOS)
+      final dbPath = await getDatabasesPath();
+      final path = join(dbPath, filePath);
 
-    return await openDatabase(
-      path,
-      version: 1,
-      onCreate: _createDB,
-    );
+      return await openDatabase(
+        path,
+        version: 1,
+        onCreate: _createDB,
+      );
+    }
   }
 
   Future _createDB(Database db, int version) async {
@@ -94,6 +107,24 @@ class AppDatabase {
     } else {
       return null; // Sai email hoặc mật khẩu
     }
+  }
+
+  // Kiểm tra email tồn tại
+  Future<bool> checkEmailExists(String email) async {
+    final db = await instance.database;
+    final result = await db.query('users', where: 'email = ?', whereArgs: [email]);
+    return result.isNotEmpty;
+  }
+
+  // Cập nhật mật khẩu mới
+  Future<int> resetPassword(String email, String newPassword) async {
+    final db = await instance.database;
+    return await db.update(
+      'users',
+      {'password': newPassword},
+      where: 'email = ?',
+      whereArgs: [email],
+    );
   }
 
   // Thêm bài hát vào Favorite

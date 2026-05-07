@@ -31,6 +31,7 @@ dependencies:
   flutter:
     sdk: flutter
   sqflite: ^2.4.2
+  sqflite_common_ffi_web: ^1.1.0+1
   path: ^1.9.1
 
   # The following adds the Cupertino Icons font to your application.
@@ -42,6 +43,7 @@ dependencies:
   audio_video_progress_bar: ^2.0.3
   image_picker: ^1.2.1
   shared_preferences: ^2.5.5
+  mailer: ^6.1.0
 
 dev_dependencies:
   flutter_test:

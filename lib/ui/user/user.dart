@@ -8,7 +8,8 @@ import '../../main.dart'; // ĐẢM BẢO IMPORT ĐÚNG FILE CHỨA CLASS MusicA
 import 'playlist_detail.dart';
 
 class AccountTab extends StatefulWidget {
-  const AccountTab({super.key});
+  final String userId;
+  const AccountTab({super.key, required this.userId});
 
   @override
   State<AccountTab> createState() => _AccountTabState();
@@ -81,8 +82,7 @@ class _AccountTabState extends State<AccountTab> {
 
   // --- LOGIC PLAYLIST ---
   Future<void> _loadPlaylists() async {
-    const userId = "user_01";
-    final data = await _repository.getUserPlaylists(userId);
+    final data = await _repository.getUserPlaylists(widget.userId);
     setState(() {
       // SỬA TẠI ĐÂY: Chuyển toàn bộ dữ liệu từ DB sang Map có thể chỉnh sửa (Mutable)
       _playlists = data.map((item) => Map<String, dynamic>.from(item)).toList();
