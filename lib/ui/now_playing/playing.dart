@@ -1,11 +1,15 @@
 import 'dart:math';
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 
+import '../../data/firebase_service.dart';
 import '../../data/model/song.dart';
+import '../setting/premium_screen.dart';
 import 'audio_player_manager.dart';
+import 'premium_ad_dialog.dart';
 
 class NowPlaying extends StatelessWidget {
   const NowPlaying({super.key, required this.playingSong, required this.songs});
@@ -39,6 +43,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> with SingleTickerProvid
   late double _currentAnimationPosition;
   late LoopMode _loopMode;
   bool _isShuffle = false;
+  bool _isPremium = true; // Mặc định là true để không hiện quảng cáo khi đang load
 
   @override
   void initState(){
@@ -50,20 +55,59 @@ class _NowPlayingPageState extends State<NowPlayingPage> with SingleTickerProvid
       duration: const Duration(milliseconds: 12000),
     );
     _audioPlayerManager = AudioPlayerManager();
+    _audioPlayerManager.isNowPlayingOpen.value = true; // Đánh dấu là đang mở trang phát nhạc
+    _checkPremium();
 
     // ĐỒNG BỘ PLAYLIST VỚI MANAGER
     _audioPlayerManager.currentPlaylist = widget.songs;
     _audioPlayerManager.currentIndex = widget.songs.indexOf(widget.playingSong);
 
     if(_audioPlayerManager.songUrl.compareTo(_song.source) != 0){
-      _audioPlayerManager.updateSongUrl(_song.source, song: _song); // Đã thêm song
-      _audioPlayerManager.prepare(isNewSong: true);
+      _audioPlayerManager.updateSongUrl(_song.source, song: _song); 
+      // XÓA DÒNG GỌI prepare Ở ĐÂY VÌ updateSongUrl ĐÃ TỰ GỌI RỒI
     } else {
       _audioPlayerManager.prepare(isNewSong: false);
     }
 
     _selectedItemIndex = widget.songs.indexOf(widget.playingSong);
     _loopMode = LoopMode.off;
+  }
+
+  Future<void> _checkPremium() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final premium = await FirebaseService.instance.isUserPremium(user.uid);
+      if (mounted) {
+        setState(() {
+          _isPremium = premium;
+        });
+
+        // Nếu không phải Premium thì hiện quảng cáo chặn nhạc
+        if (!premium) {
+          _audioPlayerManager.player.pause(); // Dừng nhạc
+          
+          if (mounted) {
+            showDialog(
+              context: context,
+              barrierDismissible: false, // Bắt buộc phải nhấn X mới tắt được
+              builder: (context) => PremiumAdDialog(
+                userId: user.uid,
+                onDismiss: () {
+                  _audioPlayerManager.player.play(); // Chạy lại nhạc khi tắt quảng cáo
+                },
+              ),
+            );
+          }
+        }
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _imageAnimController.dispose();
+    _audioPlayerManager.isNowPlayingOpen.value = false; // Đánh dấu là đã đóng trang phát nhạc
+    super.dispose();
   }
 
   @override
@@ -108,7 +152,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> with SingleTickerProvid
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const SizedBox(height: 100),
+            const Spacer(),
             Hero(
               tag: 'song_art_${_song.id}',
               child: RotationTransition(
@@ -142,7 +186,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> with SingleTickerProvid
                 ),
               ),
             ),
-            const SizedBox(height: 60),
+            const Spacer(),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Row(
@@ -151,11 +195,35 @@ class _NowPlayingPageState extends State<NowPlayingPage> with SingleTickerProvid
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          _song.title,
-                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: -0.5),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                _song.title,
+                                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (_isPremium) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: colorScheme.primary, width: 1.5),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'LOSSLESS',
+                                  style: TextStyle(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -175,17 +243,17 @@ class _NowPlayingPageState extends State<NowPlayingPage> with SingleTickerProvid
                 ],
               ),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 20),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: _progressbar(),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _mediaButtons(),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -193,7 +261,8 @@ class _NowPlayingPageState extends State<NowPlayingPage> with SingleTickerProvid
                 const SizedBox(width: 40),
                 IconButton(icon: const Icon(Icons.playlist_play_rounded, size: 28), onPressed: () {}),
               ],
-            )
+            ),
+            if (!_isPremium) const SizedBox(height: 20) else const SizedBox(height: 20),
           ],
         ),
       ),

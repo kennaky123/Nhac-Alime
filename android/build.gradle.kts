@@ -1,3 +1,8 @@
+// 1. THÊM KHỐI PLUGINS NÀY VÀO ĐẦU FILE
+plugins {
+    id("com.google.gms.google-services") version "4.4.1" apply false
+}
+
 allprojects {
     repositories {
         google()
@@ -5,6 +10,7 @@ allprojects {
     }
 }
 
+// ... các dòng bên dưới giữ nguyên như cũ ...
 val newBuildDir: Directory =
     rootProject.layout.buildDirectory
         .dir("../../build")

@@ -1,10 +1,11 @@
 import 'dart:io';
-import 'package:flutter/cupertino.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/reponsitory/music_repository_impl.dart';
 import '../../main.dart'; // ĐẢM BẢO IMPORT ĐÚNG FILE CHỨA CLASS MusicApp
+import '../setting/premium_screen.dart';
 import 'playlist_detail.dart';
 
 class AccountTab extends StatefulWidget {
@@ -21,26 +22,39 @@ class _AccountTabState extends State<AccountTab> {
   bool _isLoading = true;
 
   // Biến lưu thông tin người dùng
-  String _userName = "Người Dùng";
+  String _userName = "Đang tải...";
   File? _avatarImage;
 
   @override
   void initState() {
     super.initState();
     _loadPlaylists();
-    _loadUserData(); // Tải tên và ảnh đã lưu
+    _loadUserData(); // Tải dữ liệu từ Firestore
   }
 
-  // --- LOGIC NGƯỜI DÙNG (ẢNH & TÊN) ---
+  // --- LOGIC NGƯỜI DÙNG (ẢNH & TÊN TỪ FIRESTORE) ---
   Future<void> _loadUserData() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _userName = prefs.getString('username') ?? "Người Dùng";
-      String? imagePath = prefs.getString('avatar_path');
-      if (imagePath != null && imagePath.isNotEmpty) {
-        _avatarImage = File(imagePath);
+    try {
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(widget.userId).get();
+      if (userDoc.exists && mounted) {
+        setState(() {
+          _userName = userDoc.get('username') ?? "Người Dùng";
+          // Ảnh đại diện vẫn có thể dùng SharedPreferences hoặc Firestore tùy bạn, 
+          // hiện tại tôi giữ logic cũ cho ảnh hoặc bạn có thể nâng cấp sau.
+        });
       }
-    });
+    } catch (e) {
+      if (mounted) setState(() => _userName = "Người Dùng");
+    }
+    
+    // Tải ảnh đại diện cục bộ (nếu có)
+    final prefs = await SharedPreferences.getInstance();
+    String? imagePath = prefs.getString('avatar_path');
+    if (imagePath != null && imagePath.isNotEmpty && mounted) {
+      setState(() {
+        _avatarImage = File(imagePath);
+      });
+    }
   }
 
   Future<void> _pickImage() async {
@@ -67,8 +81,10 @@ class _AccountTabState extends State<AccountTab> {
           ElevatedButton(
             onPressed: () async {
               if (controller.text.isNotEmpty) {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('username', controller.text);
+                // Cập nhật tên lên Firestore
+                await FirebaseFirestore.instance.collection('users').doc(widget.userId).update({
+                  'username': controller.text,
+                });
                 setState(() => _userName = controller.text);
                 if (mounted) Navigator.pop(context);
               }
@@ -91,7 +107,7 @@ class _AccountTabState extends State<AccountTab> {
   }
 
   // HÀM ĐỔI TÊN PLAYLIST: Đã sửa để tránh lỗi Read-only
-  void _showRenamePlaylistDialog(int playlistId, String currentTitle, int index) {
+  void _showRenamePlaylistDialog(String playlistId, String currentTitle, int index) {
     final controller = TextEditingController(text: currentTitle);
     showDialog(
       context: context,
@@ -149,8 +165,8 @@ class _AccountTabState extends State<AccountTab> {
     );
   }
 
-  Future<void> _deletePlaylist(int playlistId, int index) async {
-    await _repository.deletePlaylist(playlistId);
+  Future<void> _deletePlaylist(String id, int index) async {
+    await _repository.deletePlaylist(id);
     setState(() {
       _playlists.removeAt(index);
     });
@@ -230,6 +246,35 @@ class _AccountTabState extends State<AccountTab> {
               ],
             ),
           ),
+          // NÚT ĐĂNG KÝ PREMIUM
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => PremiumScreen(userId: widget.userId)),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Colors.orange, Colors.amber]),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.stars, color: Colors.white),
+                    SizedBox(width: 12),
+                    Text('Đăng ký Music Premium',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                    Spacer(),
+                    Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
+                  ],
+                ),
+              ),
+            ),
+          ),
           const Divider(),
 
           const Padding(
@@ -257,14 +302,15 @@ class _AccountTabState extends State<AccountTab> {
                     padding: const EdgeInsets.only(right: 20),
                     child: const Icon(Icons.delete, color: Colors.white),
                   ),
-                  onDismissed: (direction) => _deletePlaylist(playlist['id'], index),
+                  onDismissed: (direction) => _deletePlaylist(playlist['id'].toString(), index),
                   child: ListTile(
                     leading: const Icon(Icons.album, color: Colors.deepPurple),
                     title: Text(playlist['title']),
                     onTap: () {
                       Navigator.push(context, MaterialPageRoute(builder: (context) => PlaylistDetailScreen(
-                        playlistId: playlist['id'],
+                        playlistId: playlist['id'].toString(),
                         playlistTitle: playlist['title'],
+                        userId: widget.userId,
                       )));
                     },
                     trailing: Row(
@@ -272,7 +318,7 @@ class _AccountTabState extends State<AccountTab> {
                       children: [
                         IconButton(
                           icon: const Icon(Icons.edit_note, color: Colors.blue),
-                          onPressed: () => _showRenamePlaylistDialog(playlist['id'], playlist['title'], index),
+                          onPressed: () => _showRenamePlaylistDialog(playlist['id'].toString(), playlist['title'], index),
                         ),
                         const Icon(Icons.drag_handle, color: Colors.grey),
                       ],

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../data/database.dart';
-import '../discovery/discovery.dart';
+import '../../data/firebase_service.dart';
+import '../admin/admin_dashboard.dart';
 import '../home/home.dart';
 import 'forgot_password.dart';
 
@@ -18,6 +18,14 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   String _message = '';
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Tự động tạo admin nếu chưa có
+    FirebaseService.instance.setupAdminAccount();
+  }
 
   Future<void> _submit() async {
     final email = _emailController.text.trim();
@@ -29,40 +37,56 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    if (_isLogin) {
-      // XỬ LÝ ĐĂNG NHẬP
-      final userId = await AppDatabase.instance.loginUser(email, password);
-      if (userId != null) {
-        if (mounted) {
-          Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (context) => MusicHomepage(userId: userId)),
-          );
+    setState(() {
+      _isLoading = true;
+      _message = '';
+    });
+
+    try {
+      if (_isLogin) {
+        // XỬ LÝ ĐĂNG NHẬP VỚI FIREBASE
+        final user = await FirebaseService.instance.login(email, password);
+        if (user != null) {
+          // LẤY QUYỀN CỦA USER
+          final role = await FirebaseService.instance.getUserRole(user.uid);
+          
+          if (mounted) {
+            if (role == 'admin') {
+              // CHUYỂN SANG TRANG ADMIN
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const AdminDashboard()),
+              );
+            } else {
+              // CHUYỂN SANG TRANG NGƯỜI DÙNG THƯỜNG
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => MusicHomepage(userId: user.uid)),
+              );
+            }
+          }
         }
       } else {
-        setState(() => _message = 'Email hoặc mật khẩu không đúng!');
-      }
-    } else {
-      // XỬ LÝ ĐĂNG KÝ
-      if (username.isEmpty) {
-        setState(() => _message = 'Vui lòng nhập Tên hiển thị!');
-        return;
-      }
-      try {
-        final newUserId = 'user_${DateTime.now().millisecondsSinceEpoch}'; // Tạo ID ngẫu nhiên
-        await AppDatabase.instance.createUser({
-          'id': newUserId,
-          'username': username,
-          'email': email,
-          'password': password,
-        });
+        // XỬ LÝ ĐĂNG KÝ VỚI FIREBASE
+        if (username.isEmpty) {
+          setState(() {
+            _message = 'Vui lòng nhập Tên hiển thị!';
+            _isLoading = false;
+          });
+          return;
+        }
+        await FirebaseService.instance.signUp(email, password, username);
         setState(() {
           _message = 'Đăng ký thành công! Vui lòng đăng nhập.';
-          _isLogin = true; // Chuyển về màn hình đăng nhập
+          _isLogin = true;
+          _isLoading = false;
         });
-      } catch (e) {
-        // Lỗi thường do trùng Email (Ràng buộc UNIQUE trong DB)
-        setState(() => _message = 'Email này đã được sử dụng!');
       }
+    } catch (e) {
+      setState(() {
+        _message = 'Lỗi: ${e.toString()}';
+        _isLoading = false;
+      });
     }
   }
 
@@ -185,16 +209,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: _submit,
+                      onPressed: _isLoading ? null : _submit,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: colorScheme.primary,
                         foregroundColor: colorScheme.onPrimary,
                         elevation: 0,
                       ),
-                      child: Text(
-                        _isLogin ? 'Sign In' : 'Sign Up',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
+                      child: _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : Text(
+                              _isLogin ? 'Sign In' : 'Sign Up',
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 24),

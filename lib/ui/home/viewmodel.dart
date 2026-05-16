@@ -7,8 +7,10 @@ class MusicViewModel extends ChangeNotifier {
   final String userId;
 
   List<Song> _songs = [];
-  List<Song> get songs => _songs;
+  List<Song> _filteredSongs = [];
+  List<Song> get songs => _filteredSongs.isEmpty && _searchQuery.isEmpty ? _songs : _filteredSongs;
 
+  String _searchQuery = "";
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
@@ -20,12 +22,31 @@ class MusicViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _songs = await _repository.fetchSongs();
+      _songs = await _repository.fetchSongs(userId);
+      _filterSongs(); // Áp dụng lọc ngay sau khi tải
     } catch (e) {
       debugPrint("Error loading songs: $e");
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  void searchSongs(String query) {
+    _searchQuery = query;
+    _filterSongs();
+    notifyListeners();
+  }
+
+  void _filterSongs() {
+    if (_searchQuery.isEmpty) {
+      _filteredSongs = _songs;
+    } else {
+      _filteredSongs = _songs
+          .where((song) =>
+              song.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              song.artist.toLowerCase().contains(_searchQuery.toLowerCase()))
+          .toList();
     }
   }
 
@@ -49,7 +70,7 @@ class MusicViewModel extends ChangeNotifier {
     await loadUserPlaylists();
   }
 
-  Future<void> addSongToPlaylist(int playlistId, String songId) async {
+  Future<void> addSongToPlaylist(String playlistId, String songId) async {
     await _repository.addSongToPlaylist(playlistId, songId);
   }
 

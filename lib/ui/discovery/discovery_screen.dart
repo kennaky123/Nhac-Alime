@@ -3,8 +3,9 @@ import '../../data/reponsitory/repository.dart'; // Chỉnh lại đường dẫ
 
 class DiscoveryScreen extends StatefulWidget {
   final Repository repository;
+  final String userId;
 
-  const DiscoveryScreen({Key? key, required this.repository}) : super(key: key);
+  const DiscoveryScreen({Key? key, required this.repository, required this.userId}) : super(key: key);
 
   @override
   State<DiscoveryScreen> createState() => _DiscoveryScreenState();
@@ -24,9 +25,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   // Hàm gọi dữ liệu từ Repository
   Future<void> _fetchData() async {
     try {
-      // Tạm dùng "user_01" như bạn đã cài đặt
-      final recommended = await widget.repository.getRecommendedSongs("user_01");
-      final trending = await widget.repository.getTrendingSongs();
+      final recommended = await widget.repository.getRecommendedSongs(widget.userId);
+      final trending = await widget.repository.getTrendingSongs(widget.userId);
 
       setState(() {
         recommendedSongs = recommended;

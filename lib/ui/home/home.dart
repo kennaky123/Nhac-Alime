@@ -1,5 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:music_app/data/firebase_service.dart';
 import 'package:music_app/ui/home/viewmodel.dart';
 import 'package:music_app/ui/now_playing/audio_player_manager.dart';
 import 'package:music_app/data/model/song.dart';
@@ -28,6 +30,7 @@ class _MusicHomepageState extends State<MusicHomepage> {
 
   Song? _currentPlayingSong;
   bool _isPlaying = false;
+  bool _isNowPlayingOpen = false;
 
   @override
   void initState() {
@@ -42,16 +45,39 @@ class _MusicHomepageState extends State<MusicHomepage> {
 
     AudioPlayerManager().currentSongNotifier.addListener(() {
       if (mounted) {
-        setState(() {
-          _currentPlayingSong = AudioPlayerManager().currentSongNotifier.value;
+        // Sử dụng addPostFrameCallback để tránh lỗi "setState() during build"
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {
+              _currentPlayingSong = AudioPlayerManager().currentSongNotifier.value;
+            });
+          }
+        });
+      }
+    });
+
+    AudioPlayerManager().isNowPlayingOpen.addListener(() {
+      if (mounted) {
+        // Sử dụng addPostFrameCallback để tránh lỗi "setState() when widget tree was locked"
+        // Đặc biệt là khi giá trị này thay đổi trong hàm dispose() của trang khác
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {
+              _isNowPlayingOpen = AudioPlayerManager().isNowPlayingOpen.value;
+            });
+          }
         });
       }
     });
 
     AudioPlayerManager().player.playingStream.listen((playing) {
       if (mounted) {
-        setState(() {
-          _isPlaying = playing;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {
+              _isPlaying = playing;
+            });
+          }
         });
       }
     });
@@ -80,7 +106,7 @@ class _MusicHomepageState extends State<MusicHomepage> {
               return CupertinoTabView(builder: (context) => _tabs[index]);
             },
           ),
-          if (_currentPlayingSong != null)
+          if (_currentPlayingSong != null && !_isNowPlayingOpen)
             Positioned(
               bottom: 60, // Đẩy lên một chút để không bị đè bởi TabBar
               left: 12,
@@ -150,7 +176,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   Future<void> _fetchData() async {
     try {
       final recommended = await widget.repository.getRecommendedSongs(widget.userId);
-      final trending = await widget.repository.getTrendingSongs();
+      final trending = await widget.repository.getTrendingSongs(widget.userId);
       setState(() {
         recommendedSongs = recommended;
         trendingSongs = trending;
@@ -400,20 +426,33 @@ class HomeTabPage extends StatefulWidget {
 
 class _HomeTabPageState extends State<HomeTabPage> {
   List<Song> songs = [];
+  List<Song> losslessSongs = [];
+  bool isPremium = false;
   late MusicViewModel _viewModel;
+  final _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    _checkPremium();
     _viewModel = MusicViewModel(repository: MusicRepositoryImpl(), userId: widget.userId);
     _viewModel.addListener(() {
       if (mounted) {
         setState(() {
           songs = _viewModel.songs;
+          // Lọc nhạc Lossless (do Admin thêm từ Firestore)
+          losslessSongs = _viewModel.songs.where((s) => !s.source.contains('thantrieu.com')).toList();
         });
       }
     });
     _viewModel.loadSongs();
+  }
+
+  Future<void> _checkPremium() async {
+    final status = await FirebaseService.instance.isUserPremium(widget.userId);
+    if (mounted) {
+      setState(() => isPremium = status);
+    }
   }
 
   void _showCreatePlaylistDialog(BuildContext context) {
@@ -450,12 +489,98 @@ class _HomeTabPageState extends State<HomeTabPage> {
       appBar: AppBar(
         title: const Text('My Library', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 24)),
       ),
-      body: songs.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-        padding: const EdgeInsets.only(bottom: 150),
-        itemBuilder: (context, position) => _SongItemSection(parent: this, song: songs[position]),
-        itemCount: songs.length,
+      body: Column(
+        children: [
+          // THANH TÌM KIẾM
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search songs, artists...',
+                prefixIcon: const Icon(Icons.search),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onChanged: (value) => _viewModel.searchSongs(value),
+            ),
+          ),
+          Expanded(
+            child: songs.isEmpty && !_viewModel.isLoading
+                ? const Center(child: Text('No songs found.'))
+                : _viewModel.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : ListView(
+                        padding: const EdgeInsets.only(bottom: 150),
+                        children: [
+                          // DÒNG NHẠC LOSSLESS (Chỉ cho Premium)
+                          if (isPremium && losslessSongs.isNotEmpty) ...[
+                            const Padding(
+                              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                              child: Text(
+                                'LOSSLESS EXPERIENCE',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.2,
+                                  color: Colors.amber,
+                                ),
+                              ),
+                            ),
+                            SizedBox(
+                              height: 180,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                itemCount: losslessSongs.length,
+                                itemBuilder: (context, index) {
+                                  final song = losslessSongs[index];
+                                  return _buildLosslessCard(song);
+                                },
+                              ),
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.fromLTRB(16, 24, 16, 8),
+                              child: Text(
+                                'ALL SONGS',
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                          // DANH SÁCH NHẠC CHÍNH
+                          ...songs.map((song) => _SongItemSection(parent: this, song: song)).toList(),
+                        ],
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLosslessCard(Song song) {
+    return GestureDetector(
+      onTap: () => navigate(song),
+      child: Container(
+        width: 140,
+        margin: const EdgeInsets.symmetric(horizontal: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.network(
+                song.image,
+                height: 120,
+                width: 140,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(color: Colors.grey, child: const Icon(Icons.music_note)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(song.artist, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          ],
+        ),
       ),
     );
   }

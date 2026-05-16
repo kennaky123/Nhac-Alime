@@ -5,13 +5,15 @@ import '../../data/reponsitory/music_repository_impl.dart';
 import '../now_playing/playing.dart'; // Import màn hình phát nhạc vào đây
 
 class PlaylistDetailScreen extends StatefulWidget {
-  final int playlistId;
+  final String playlistId;
   final String playlistTitle;
+  final String userId;
 
   const PlaylistDetailScreen({
     super.key,
     required this.playlistId,
-    required this.playlistTitle
+    required this.playlistTitle,
+    required this.userId,
   });
 
   @override
@@ -32,7 +34,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   // Tải các bài hát thuộc Playlist này
   Future<void> _loadSongsForPlaylist() async {
     final songIds = await _repository.getSongIdsFromPlaylist(widget.playlistId);
-    final allSongs = await _repository.fetchSongs();
+    final allSongs = await _repository.fetchSongs(widget.userId);
 
     // Lọc ra những bài hát có trong playlist
     final filteredSongs = allSongs.where((song) => songIds.contains(song.id)).toList();

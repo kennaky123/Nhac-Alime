@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:rxdart/rxdart.dart';
 import '../../data/model/song.dart';
-import '../home/home.dart';
 import 'dart:async';
 
 class AudioPlayerManager {
@@ -16,6 +15,9 @@ class AudioPlayerManager {
 
   // Báo hiệu bài hát đang phát cho Mini Player
   final ValueNotifier<Song?> currentSongNotifier = ValueNotifier<Song?>(null);
+
+  // Báo hiệu trang NowPlaying đang mở
+  final ValueNotifier<bool> isNowPlayingOpen = ValueNotifier<bool>(false);
 
   // Lưu danh sách phát hiện tại
   List<Song> currentPlaylist = [];
@@ -37,7 +39,7 @@ class AudioPlayerManager {
     _sleepTimer?.cancel();
   }
 
-  void prepare({bool isNewSong = false}){
+  Future<void> prepare({bool isNewSong = false}) async {
     durationState = Rx.combineLatest2<Duration, PlaybackEvent, DurationState>(
         player.positionStream,
         player.playbackEventStream,
@@ -48,16 +50,28 @@ class AudioPlayerManager {
         )
     );
     if(isNewSong){
-      player.setUrl(songUrl);
+      try {
+        // Chỉ giữ lại chức năng lấy nhạc từ Assets
+        if (songUrl.startsWith('assets/')) {
+          await player.setAsset(songUrl);
+        } else {
+          // Fallback cho link web cũ nếu có (ví dụ nhạc từ API JSON)
+          await player.setUrl(songUrl);
+        }
+      } catch (e) {
+        debugPrint("Error loading audio source: $e");
+      }
     }
   }
 
-  void updateSongUrl(String url, {Song? song}) {
-    songUrl = url;
+  void updateSongUrl(String url, {Song? song}) async {
     if (song != null) {
       currentSongNotifier.value = song;
     }
-    prepare(isNewSong: true);
+
+    songUrl = url;
+    await prepare(isNewSong: true);
+    player.play();
   }
 
   // Hàm chuyển bài tiếp theo (dành cho Mini Player)
@@ -70,7 +84,6 @@ class AudioPlayerManager {
     }
     final next = currentPlaylist[currentIndex];
     updateSongUrl(next.source, song: next);
-    player.play(); // Tự động phát khi qua bài
   }
 
   // Hàm lùi bài (dành cho Mini Player)
@@ -83,7 +96,6 @@ class AudioPlayerManager {
     }
     final prev = currentPlaylist[currentIndex];
     updateSongUrl(prev.source, song: prev);
-    player.play(); // Tự động phát khi lùi bài
   }
 
   void stopMusic() {

@@ -1,23 +1,21 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:music_app/ui/home/home.dart';
 import 'package:music_app/ui/user/login.dart';
-
-import 'data/database.dart';
 
 // 1. THÊM BIẾN NÀY ĐỂ ĐIỀU KHIỂN GIAO DIỆN SÁNG/TỐI
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 
 void main() async {
-  // Đảm bảo Flutter đã khởi tạo xong trước khi đụng vào Database
+  // Đảm bảo Flutter đã khởi tạo xong trước khi đụng vào Database hoặc Firebase
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Tạo user mẫu để test (Chỉ cần chạy 1 lần hoặc dùng admin@gmail.com / 123)
-  // await AppDatabase.instance.createUser({
-  //   'id': 'user_01',
-  //   'username': 'Nguyen Van A',
-  //   'email': 'admin@gmail.com',
-  //   'password': '123',
-  // });
+  // Khởi tạo Firebase
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('Firebase initialization error: $e');
+    // Lưu ý: Code sẽ lỗi ở đây nếu chưa có file google-services.json
+  }
 
   runApp(const MusicApp());
 }

@@ -1,29 +1,49 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
 
-import '../database.dart';
+import '../firebase_service.dart';
 import '../model/song.dart';
 import '../source/source.dart';
 import 'repository.dart';
 
 class MusicRepositoryImpl implements Repository {
-  final AppDatabase _db = AppDatabase.instance;
+  final FirebaseService _fb = FirebaseService.instance;
   final RemoteDataSource _api = RemoteDataSource();
 
-  // ==========================================
-  // PHẦN 1: CÁC HÀM TỪ API VÀ DATABASE CŨ CỦA BẠN
-  // ==========================================
-
   @override
-  Future<List<Song>> fetchSongs() async {
-    final allSongs = await _api.loadData();
+  Future<List<Song>> fetchSongs(String userId) async {
+    // 1. Lấy nhạc từ API JSON cũ (Tất cả mọi người đều thấy)
+    final apiSongs = await _api.loadData() ?? [];
 
-    if (allSongs == null) {
-      return [];
+    // 2. Kiểm tra quyền Premium
+    bool isPremium = false;
+    if (userId.isNotEmpty) {
+      isPremium = await _fb.isUserPremium(userId);
     }
 
-    String currentUserId = "user_01";
-    final favIds = await getFavoriteSongIds(currentUserId);
+    List<Song> allSongs;
+
+    if (isPremium) {
+      // 3. Nếu là Premium: Lấy thêm nhạc từ Firestore (Nhạc Lossless do Admin thêm)
+      final firestoreData = await _fb.getAllSongs();
+      final firestoreSongs = firestoreData.map((data) => Song(
+        id: data['id'],
+        title: data['title'] ?? 'Unknown',
+        album: data['album'] ?? 'Unknown',
+        artist: data['artist'] ?? 'Unknown',
+        source: data['source'] ?? '',
+        image: data['image'] ?? '',
+        duration: data['duration'] ?? 240,
+      )).toList();
+      
+      allSongs = [...apiSongs, ...firestoreSongs];
+    } else {
+      // Nếu không phải Premium: Chỉ trả về nhạc API
+      allSongs = apiSongs;
+    }
+
+    // 4. Kiểm tra trạng thái yêu thích
+    final favIds = await getFavoriteSongIds(userId);
 
     for (var song in allSongs) {
       if (favIds.contains(song.id)) {
@@ -35,62 +55,49 @@ class MusicRepositoryImpl implements Repository {
 
   @override
   Future<List<String>> getFavoriteSongIds(String userId) async {
-    final db = await _db.database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'favorites',
-      where: 'user_id = ?',
-      whereArgs: [userId],
-    );
-    return List.generate(maps.length, (i) => maps[i]['song_id'] as String);
+    if (userId.isEmpty) return [];
+    return await _fb.getFavoriteSongIds(userId);
   }
 
   @override
   Future<void> toggleFavorite(String userId, String songId) async {
-    await _db.toggleFavorite(userId, songId);
+    if (userId.isEmpty) return;
+    await _fb.toggleFavorite(userId, songId);
   }
 
   @override
   Future<List<Map<String, dynamic>>> getUserPlaylists(String userId) async {
-    final db = await _db.database;
-    return await db.query('playlists', where: 'user_id = ?', whereArgs: [userId]);
+    if (userId.isEmpty) return [];
+    return await _fb.getUserPlaylists(userId);
   }
 
   @override
-  Future<void> addSongToPlaylist(int playlistId, String songId) async {
-    await _db.addSongToPlaylist(playlistId, songId);
+  Future<void> addSongToPlaylist(String playlistId, String songId) async {
+    await _fb.addSongToPlaylist(playlistId, songId);
   }
 
   @override
-  Future<int> createPlaylist(String title, String userId) async {
-    return await _db.createPlaylist(title, userId);
+  Future<String> createPlaylist(String title, String userId) async {
+    return await _fb.createPlaylist(title, userId);
   }
 
   @override
-  Future<void> deletePlaylist(int playlistId) async {
-    await _db.deletePlaylist(playlistId);
+  Future<void> deletePlaylist(String playlistId) async {
+    await _fb.deletePlaylist(playlistId);
   }
 
   @override
-  Future<List<String>> getSongIdsFromPlaylist(int playlistId) async {
-    return await _db.getSongIdsFromPlaylist(playlistId);
+  Future<List<String>> getSongIdsFromPlaylist(String playlistId) async {
+    return await _fb.getSongIdsFromPlaylist(playlistId);
   }
 
   @override
-  Future<void> updatePlaylist(int id, String newTitle) async {
-    final db = await _db.database;
-    await db.update(
-      'playlists',
-      {'title': newTitle},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+  Future<void> updatePlaylist(String id, String newTitle) async {
+    await _fb.updatePlaylist(id, newTitle);
   }
 
-  // ==========================================
-  // PHẦN 2: CHỨC NĂNG KHÁM PHÁ (DISCOVERY) MỚI
-  // ==========================================
+  // --- DISCOVERY ---
 
-  // Hàm phụ trợ: Đọc toàn bộ danh sách bài hát từ file JSON
   Future<List<Map<String, dynamic>>> _getAllSongsFromJson() async {
     final String response = await rootBundle.loadString('assets/songs.json');
     final data = await json.decode(response);
@@ -98,17 +105,21 @@ class MusicRepositoryImpl implements Repository {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getTrendingSongs() async {
+  Future<List<Map<String, dynamic>>> getTrendingSongs(String userId) async {
     final songs = await _getAllSongsFromJson();
+    
+    // Nếu là Premium, gộp thêm nhạc từ Firestore
+    bool isPremium = await _fb.isUserPremium(userId);
+    if (isPremium) {
+      final firestoreSongs = await _fb.getAllSongs();
+      songs.addAll(firestoreSongs);
+    }
 
-    // Sắp xếp giảm dần theo cột 'counter'
     songs.sort((a, b) {
       int counterA = a['counter'] is int ? a['counter'] : int.tryParse(a['counter'].toString()) ?? 0;
       int counterB = b['counter'] is int ? b['counter'] : int.tryParse(b['counter'].toString()) ?? 0;
       return counterB.compareTo(counterA);
     });
-
-    // Lấy 10 bài đứng đầu
     return songs.take(10).toList();
   }
 
@@ -116,15 +127,19 @@ class MusicRepositoryImpl implements Repository {
   Future<List<Map<String, dynamic>>> getRecommendedSongs(String userId) async {
     final songs = await _getAllSongsFromJson();
 
-    // Xáo trộn để có sự mới mẻ
-    songs.shuffle();
+    // Nếu là Premium, gộp thêm nhạc từ Firestore
+    bool isPremium = await _fb.isUserPremium(userId);
+    if (isPremium) {
+      final firestoreSongs = await _fb.getAllSongs();
+      songs.addAll(firestoreSongs);
+    }
 
-    // Ưu tiên chọn những bài hát có counter lớn hơn 0
+    songs.shuffle();
     final recommended = songs.where((song) {
       int counter = song['counter'] is int ? song['counter'] : int.tryParse(song['counter'].toString()) ?? 0;
-      return counter > 0;
+      // Nhạc từ Firestore không có counter, mặc định cho phép hiện ở Recommended
+      return counter > 0 || !song.containsKey('counter');
     }).take(8).toList();
-
     return recommended;
   }
 }
