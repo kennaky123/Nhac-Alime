@@ -1,4 +1,5 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'model/song.dart';
 import 'dart:convert';
 
@@ -6,20 +7,18 @@ class GeminiService {
   static final GeminiService instance = GeminiService._init();
   GeminiService._init();
 
-  // TODO: Thay thế bằng API Key thực tế của bạn từ https://aistudio.google.com/
-  static const String _apiKey = 'AIzaSyBJ_H9SMFr8S5QaHr3J4q6laAa-ADuLI94';
-  
   late final GenerativeModel _model;
   bool _isInitialized = false;
 
   void init() {
-    if (_apiKey == 'YOUR_GEMINI_API_KEY_HERE') {
-      print('⚠️ Gemini API Key chưa được thiết lập!');
+    final apiKey = dotenv.env['GEMINI_API_KEY'];
+    if (apiKey == null || apiKey.isEmpty) {
+      print('⚠️ Gemini API Key không tìm thấy trong file .env!');
       return;
     }
     _model = GenerativeModel(
-      model: 'gemini-2.5-flash',
-      apiKey: _apiKey,
+      model: 'gemini-1.5-flash',
+      apiKey: apiKey,
       generationConfig: GenerationConfig(
         responseMimeType: 'application/json',
       ),

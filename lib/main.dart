@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:music_app/ui/user/login.dart';
 
 // 1. THÊM BIẾN NÀY ĐỂ ĐIỀU KHIỂN GIAO DIỆN SÁNG/TỐI
@@ -8,6 +9,9 @@ final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 void main() async {
   // Đảm bảo Flutter đã khởi tạo xong trước khi đụng vào Database hoặc Firebase
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables
+  await dotenv.load(fileName: ".env");
 
   // Khởi tạo Firebase
   try {
