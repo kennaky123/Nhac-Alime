@@ -23,12 +23,37 @@ class PlaylistDetailScreen extends StatefulWidget {
 class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   final _repository = MusicRepositoryImpl();
   List<Song> _playlistSongs = [];
+  List<Map<String, dynamic>> _collaborators = [];
   bool _isLoading = true;
+  bool _isOwner = false;
 
   @override
   void initState() {
     super.initState();
+    _checkOwnership();
     _loadSongsForPlaylist();
+    _loadCollaborators();
+  }
+
+  Future<void> _checkOwnership() async {
+    // Trong thực tế bạn có thể truyền biến isOwner từ màn hình trước, 
+    // ở đây mình load lại từ DB để chính xác.
+    final playlists = await _repository.getUserPlaylists(widget.userId);
+    final current = playlists.firstWhere((p) => p['id'] == widget.playlistId, orElse: () => {});
+    if (mounted) {
+      setState(() {
+        _isOwner = current['is_owner'] ?? false;
+      });
+    }
+  }
+
+  Future<void> _loadCollaborators() async {
+    final collabs = await _repository.getCollaborators(widget.playlistId);
+    if (mounted) {
+      setState(() {
+        _collaborators = collabs;
+      });
+    }
   }
 
   // Tải các bài hát thuộc Playlist này
@@ -74,19 +99,29 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.playlistTitle),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person_add_alt_1),
+            onPressed: () => _showCollaboratorsDialog(),
+            tooltip: 'Cộng tác viên',
+          ),
+        ],
       ),
 
       // THÊM NÚT "PHÁT TẤT CẢ" Ở ĐÂY
       floatingActionButton: _playlistSongs.isNotEmpty
-          ? FloatingActionButton.extended(
-        onPressed: () {
-          // Nhấn phát tất cả -> Chọn bài đầu tiên trong list làm bài đang phát
-          _playMusic(_playlistSongs.first);
-        },
-        icon: const Icon(Icons.play_arrow, size: 30),
-        label: const Text('Phát tất cả', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-      )
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 60), // Đẩy lên để không bị che bởi MiniPlayer/TabBar
+              child: FloatingActionButton.extended(
+                onPressed: () {
+                  // Nhấn phát tất cả -> Chọn bài đầu tiên trong list làm bài đang phát
+                  _playMusic(_playlistSongs.first);
+                },
+                icon: const Icon(Icons.play_arrow, size: 30),
+                label: const Text('Phát tất cả', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+              ),
+            )
           : null, // Nếu playlist trống thì ẩn nút đi
 
       body: _isLoading
@@ -96,7 +131,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
           : ReorderableListView.builder(
         onReorder: _onReorder,
         itemCount: _playlistSongs.length,
-        padding: const EdgeInsets.only(bottom: 80), // Cách đáy một khoảng để không bị nút Play che mất
+        padding: const EdgeInsets.only(bottom: 140), // Tăng khoảng trống ở dưới
         itemBuilder: (context, index) {
           final song = _playlistSongs[index];
           return ListTile(
@@ -123,6 +158,84 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
             },
           );
         },
+      ),
+    );
+  }
+
+  void _showCollaboratorsDialog() {
+    final emailController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Cộng tác viên'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_isOwner) ...[
+                  TextField(
+                    controller: emailController,
+                    decoration: const InputDecoration(
+                      labelText: 'Mời bạn bè qua Email',
+                      hintText: 'example@gmail.com',
+                      suffixIcon: Icon(Icons.mail_outline),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      if (emailController.text.isNotEmpty) {
+                        try {
+                          await _repository.addCollaboratorByEmail(widget.playlistId, emailController.text);
+                          await _loadCollaborators();
+                          emailController.clear();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Đã thêm người cộng tác!')),
+                            );
+                            setDialogState(() {}); // Update dialog list
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(e.toString())),
+                            );
+                          }
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text('Mời'),
+                  ),
+                  const Divider(),
+                ],
+                const Text('Danh sách hiện tại:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                if (_collaborators.isEmpty)
+                  const Text('Chưa có người cộng tác nào.', style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _collaborators.length,
+                    itemBuilder: (context, index) {
+                      final collab = _collaborators[index];
+                      return ListTile(
+                        leading: const CircleAvatar(child: Icon(Icons.person)),
+                        title: Text(collab['username'] ?? 'No Name'),
+                        subtitle: Text(collab['email'] ?? ''),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Đóng')),
+          ],
+        ),
       ),
     );
   }

@@ -274,7 +274,18 @@ class _NowPlayingPageState extends State<NowPlayingPage> with SingleTickerProvid
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        MediaButtonControl(function: _setShuffle, icon: Icons.shuffle_rounded, color: _getShuffleColor(), size: 24),
+        IconButton(
+          onPressed: () {
+            setState(() {
+              _audioPlayerManager.isSmartShuffle = !_audioPlayerManager.isSmartShuffle;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(_audioPlayerManager.isSmartShuffle ? 'Đã bật Smart Shuffle (Giai điệu tương đồng)' : 'Đã tắt Smart Shuffle'))
+            );
+          },
+          icon: Icon(_audioPlayerManager.isSmartShuffle ? Icons.auto_awesome_rounded : Icons.shuffle_rounded),
+          color: _audioPlayerManager.isSmartShuffle ? Colors.amber : Colors.grey,
+        ),
         MediaButtonControl(function: _setPrevSong, icon: Icons.skip_previous_rounded, color: colorScheme.onSurface, size: 42),
         _playButton(),
         MediaButtonControl(function: _setNextSong, icon: Icons.skip_next_rounded, color: colorScheme.onSurface, size: 42),

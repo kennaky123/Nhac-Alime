@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../data/firebase_service.dart';
+import '../../data/source/source.dart';
 import '../user/login.dart';
 import 'admin_music_list.dart';
 import 'admin_user_manager.dart';
 import 'admin_coupon_manager.dart';
 import 'admin_approval_screen.dart';
+import 'admin_user_stats.dart';
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -97,12 +99,36 @@ class AdminDashboard extends StatelessWidget {
   }
 
   Widget _buildStatsSection(ColorScheme colorScheme) {
-    return Row(
-      children: [
-        _buildStatCard('Users', '1,240', Icons.people, Colors.blue),
-        const SizedBox(width: 16),
-        _buildStatCard('Songs', '5,800', Icons.music_note, Colors.orange),
-      ],
+    return FutureBuilder<List<int>>(
+      future: Future.wait([
+        FirebaseService.instance.getAllUsers().then((v) => v.length),
+        Future(() async {
+          // Lấy nhạc từ API
+          final apiSongs = await RemoteDataSource().loadData();
+          final apiCount = apiSongs?.length ?? 0;
+          // Lấy nhạc từ Firestore
+          final firestoreSongs = await FirebaseService.instance.getAllSongs();
+          final firestoreCount = firestoreSongs.length;
+          return apiCount + firestoreCount;
+        }),
+      ]),
+      builder: (context, snapshot) {
+        String userCount = '...';
+        String songCount = '...';
+        
+        if (snapshot.hasData) {
+          userCount = snapshot.data![0].toString();
+          songCount = snapshot.data![1].toString();
+        }
+
+        return Row(
+          children: [
+            _buildStatCard('Users', userCount, Icons.people, Colors.blue),
+            const SizedBox(width: 16),
+            _buildStatCard('Songs', songCount, Icons.music_note, Colors.orange),
+          ],
+        );
+      },
     );
   }
 
@@ -167,6 +193,14 @@ class AdminDashboard extends StatelessWidget {
           Icons.verified_user,
           Colors.blue,
           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminApprovalScreen())),
+        ),
+        _buildMenuCard(
+          context,
+          'User Statistics',
+          'View user activity',
+          Icons.analytics,
+          Colors.indigo,
+          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminUserStatsScreen())),
         ),
         _buildMenuCard(
           context,

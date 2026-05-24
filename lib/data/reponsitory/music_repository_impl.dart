@@ -142,4 +142,43 @@ class MusicRepositoryImpl implements Repository {
     }).take(8).toList();
     return recommended;
   }
+
+  // --- Collaborative Playlists ---
+
+  @override
+  Future<void> toggleCollaborative(String playlistId, bool isCollaborative) async {
+    await _fb.toggleCollaborative(playlistId, isCollaborative);
+  }
+
+  @override
+  Future<void> addCollaboratorByEmail(String playlistId, String email) async {
+    await _fb.addCollaboratorByEmail(playlistId, email);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getCollaborators(String playlistId) async {
+    return await _fb.getCollaborators(playlistId);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getNotifications(String userId) async {
+    if (userId.isEmpty) return [];
+    return await _fb.getNotifications(userId);
+  }
+
+  @override
+  Future<void> respondToInvitation(String notificationId, bool accept) async {
+    await _fb.respondToInvitation(notificationId, accept);
+  }
+
+  @override
+  Future<void> deleteNotification(String notificationId) async {
+    await _fb.deleteNotification(notificationId);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getPlayHistory(String userId) async {
+    if (userId.isEmpty) return [];
+    return await _fb.getPlayHistory(userId);
+  }
 }

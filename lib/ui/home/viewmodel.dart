@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/model/song.dart';
 import '../../data/reponsitory/repository.dart';
+import '../../data/playlist_event_bus.dart';
 
 class MusicViewModel extends ChangeNotifier {
   final Repository _repository;
@@ -9,6 +10,7 @@ class MusicViewModel extends ChangeNotifier {
   List<Song> _songs = [];
   List<Song> _filteredSongs = [];
   List<Song> get songs => _filteredSongs.isEmpty && _searchQuery.isEmpty ? _songs : _filteredSongs;
+  List<Song> get allSongsForAI => _songs; // Getter cho AI
 
   String _searchQuery = "";
   bool _isLoading = false;
@@ -68,6 +70,7 @@ class MusicViewModel extends ChangeNotifier {
   Future<void> createNewPlaylist(String title) async {
     await _repository.createPlaylist(title, userId);
     await loadUserPlaylists();
+    PlaylistEventBus().notifyPlaylistChanged();
   }
 
   Future<void> addSongToPlaylist(String playlistId, String songId) async {

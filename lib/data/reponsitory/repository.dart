@@ -16,4 +16,13 @@ abstract class Repository {
 
   Future<List<Map<String, dynamic>>> getRecommendedSongs(String userId);
   Future<List<Map<String, dynamic>>> getTrendingSongs(String userId);
+
+  // --- Collaborative Playlists ---
+  Future<void> toggleCollaborative(String playlistId, bool isCollaborative);
+  Future<void> addCollaboratorByEmail(String playlistId, String email);
+  Future<List<Map<String, dynamic>>> getCollaborators(String playlistId);
+  Future<List<Map<String, dynamic>>> getNotifications(String userId);
+  Future<void> respondToInvitation(String notificationId, bool accept);
+  Future<void> deleteNotification(String notificationId);
+  Future<List<Map<String, dynamic>>> getPlayHistory(String userId);
 }

@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:music_app/data/firebase_service.dart';
@@ -12,6 +11,8 @@ import 'package:music_app/ui/user/user.dart';
 import 'package:music_app/main.dart';
 import 'dart:async';
 import 'package:music_app/ui/user/login.dart';
+import '../history/history_screen.dart';
+import 'gemini_search_screen.dart';
 
 // ==========================================
 // MÀN HÌNH CHÍNH (Chứa thanh điều hướng Bottom Navigation)
@@ -39,6 +40,7 @@ class _MusicHomepageState extends State<MusicHomepage> {
     _tabs = [
       HomeTab(userId: currentUserId),
       DiscoveryScreen(repository: MusicRepositoryImpl(), userId: currentUserId),
+      HistoryTab(userId: currentUserId),
       AccountTab(userId: currentUserId),
       const SettingsTab(),
     ];
@@ -91,13 +93,14 @@ class _MusicHomepageState extends State<MusicHomepage> {
         children: [
           CupertinoTabScaffold(
             tabBar: CupertinoTabBar(
-              backgroundColor: colorScheme.surface.withOpacity(0.8),
+              backgroundColor: colorScheme.surface.withValues(alpha: 0.8),
               activeColor: colorScheme.primary,
-              inactiveColor: colorScheme.onSurface.withOpacity(0.5),
+              inactiveColor: colorScheme.onSurface.withValues(alpha: 0.5),
               border: Border(top: BorderSide(color: colorScheme.outlineVariant, width: 0.5)),
               items: const [
                 BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
                 BottomNavigationBarItem(icon: Icon(Icons.explore_rounded), label: 'Discovery'),
+                BottomNavigationBarItem(icon: Icon(Icons.history_rounded), label: 'History'),
                 BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Account'),
                 BottomNavigationBarItem(icon: Icon(Icons.settings_rounded), label: 'Settings'),
               ],
@@ -244,7 +247,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
               child: Text('Suggested for you', 
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: colorScheme.onSurface.withOpacity(0.9))),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: colorScheme.onSurface.withValues(alpha: 0.9))),
             ),
             SizedBox(
               height: 220,
@@ -262,7 +265,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('Trending Now', 
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: colorScheme.onSurface.withOpacity(0.9))),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: colorScheme.onSurface.withValues(alpha: 0.9))),
                   TextButton(onPressed: () {}, child: const Text('See all')),
                 ],
               ),
@@ -296,7 +299,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 10,
                     offset: const Offset(0, 5),
                   )
@@ -310,7 +313,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                     song['image'] ?? '',
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) => Container(
-                      color: colorScheme.surfaceVariant,
+                      color: colorScheme.surfaceContainerHighest,
                       child: Icon(Icons.music_note, size: 50, color: colorScheme.onSurfaceVariant),
                     ),
                   ),
@@ -326,7 +329,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
             ),
             Text(
               song['artist'] ?? 'Unknown',
-              style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 13),
+              style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 13),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -343,7 +346,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5), width: 1),
+        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5), width: 1),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -357,7 +360,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
-                  color: rank <= 3 ? colorScheme.primary : colorScheme.onSurface.withOpacity(0.3),
+                  color: rank <= 3 ? colorScheme.primary : colorScheme.onSurface.withValues(alpha: 0.3),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -373,7 +376,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                 errorBuilder: (context, error, stackTrace) => Container(
                   width: 54,
                   height: 54,
-                  color: colorScheme.surfaceVariant,
+                  color: colorScheme.surfaceContainerHighest,
                   child: Icon(Icons.music_note, color: colorScheme.onSurfaceVariant),
                 ),
               ),
@@ -388,7 +391,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         ),
         subtitle: Text(
           song['artist'] ?? 'Unknown',
-          style: TextStyle(fontSize: 13, color: colorScheme.onSurface.withOpacity(0.6)),
+          style: TextStyle(fontSize: 13, color: colorScheme.onSurface.withValues(alpha: 0.6)),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -472,7 +475,7 @@ class _HomeTabPageState extends State<HomeTabPage> {
             onPressed: () async {
               if (controller.text.isNotEmpty) {
                 await _viewModel.createNewPlaylist(controller.text);
-                if (mounted) Navigator.pop(context);
+                if (context.mounted) Navigator.pop(context);
               }
             },
             child: const Text('Tạo'),
@@ -488,6 +491,21 @@ class _HomeTabPageState extends State<HomeTabPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Library', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 24)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.psychology_rounded, color: Colors.blue, size: 28),
+            onPressed: () {
+              Navigator.push(
+                context,
+                CupertinoPageRoute(
+                  builder: (context) => GeminiSearchScreen(allSongs: _viewModel.allSongsForAI),
+                ),
+              );
+            },
+            tooltip: 'Gemini Assistant',
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Column(
         children: [
@@ -660,7 +678,7 @@ class _SongItemSection extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           )
@@ -680,7 +698,7 @@ class _SongItemSection extends StatelessWidget {
           ),
         ),
         title: Text(song.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        subtitle: Text(song.artist, style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 13)),
+        subtitle: Text(song.artist, style: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.6), fontSize: 13)),
         trailing: IconButton(onPressed: () => parent.showBottomSheet(song), icon: const Icon(Icons.more_vert_rounded)),
         onTap: () => parent.navigate(song),
       ),
@@ -721,11 +739,11 @@ class MiniPlayer extends StatelessWidget {
         height: 72,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: colorScheme.primaryContainer.withOpacity(0.95),
+          color: colorScheme.primaryContainer.withValues(alpha: 0.95),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.15),
+              color: Colors.black.withValues(alpha: 0.15),
               blurRadius: 15,
               offset: const Offset(0, 5),
             )
@@ -740,7 +758,7 @@ class MiniPlayer extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     )
@@ -775,7 +793,7 @@ class MiniPlayer extends StatelessWidget {
                     song.artist,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: colorScheme.onPrimaryContainer.withOpacity(0.7)),
+                    style: TextStyle(fontSize: 12, color: colorScheme.onPrimaryContainer.withValues(alpha: 0.7)),
                   ),
                 ],
               ),
@@ -793,7 +811,7 @@ class MiniPlayer extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.close_rounded, size: 20),
               onPressed: onClose,
-              color: colorScheme.onPrimaryContainer.withOpacity(0.5),
+              color: colorScheme.onPrimaryContainer.withValues(alpha: 0.5),
             ),
           ],
         ),

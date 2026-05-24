@@ -34,6 +34,7 @@ dependencies:
   firebase_core: ^3.1.0
   firebase_auth: ^5.1.0
   cloud_firestore: ^5.0.1
+  firebase_storage: ^12.0.1
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -45,6 +46,9 @@ dependencies:
   image_picker: ^1.2.1
   shared_preferences: ^2.5.5
   mailer: ^6.1.0
+  file_picker: ^8.0.0
+  google_generative_ai: ^0.4.7
+  youtube_explode_dart: ^3.1.0
 
 dev_dependencies:
   flutter_test:
@@ -69,7 +73,5 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/songs.json
-    - assets/apple-music-app-for-windows-icon.png
     - assets/
 
