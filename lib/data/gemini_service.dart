@@ -13,11 +13,11 @@ class GeminiService {
   void init() {
     final apiKey = dotenv.env['GEMINI_API_KEY'];
     if (apiKey == null || apiKey.isEmpty) {
-      print('⚠️ Gemini API Key không tìm thấy trong file .env!');
+      print(' Gemini API Key không tìm thấy trong file .env!');
       return;
     }
     _model = GenerativeModel(
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.5-flash',
       apiKey: apiKey,
       generationConfig: GenerationConfig(
         responseMimeType: 'application/json',
