@@ -202,14 +202,6 @@ class AdminDashboard extends StatelessWidget {
           Colors.indigo,
           () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminUserStatsScreen())),
         ),
-        _buildMenuCard(
-          context,
-          'Settings',
-          'System Config',
-          Icons.settings,
-          Colors.blueGrey,
-          () {},
-        ),
       ],
     );
   }

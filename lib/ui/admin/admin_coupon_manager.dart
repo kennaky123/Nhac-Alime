@@ -68,6 +68,29 @@ class _AdminCouponManagerScreenState extends State<AdminCouponManagerScreen> {
     );
   }
 
+  Future<void> _confirmDelete(String code) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xác nhận xóa'),
+        content: Text('Bạn có chắc chắn muốn xóa coupon "$code"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Hủy')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _fb.deleteCoupon(code);
+      _loadCoupons();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -82,11 +105,47 @@ class _AdminCouponManagerScreenState extends State<AdminCouponManagerScreen> {
               itemCount: _coupons.length,
               itemBuilder: (context, index) {
                 final coupon = _coupons[index];
-                return ListTile(
-                  leading: const Icon(Icons.card_giftcard, color: Colors.orange),
-                  title: Text(coupon['code']),
-                  subtitle: Text('Discount: ${coupon['discount']} VNĐ'),
-                  trailing: Text('Used: ${coupon['used_count']} / ${coupon['max_usage']}'),
+                final code = coupon['code'];
+                final isActive = coupon['is_active'] ?? true;
+
+                return Opacity(
+                  opacity: isActive ? 1.0 : 0.5,
+                  child: ListTile(
+                    leading: const Icon(Icons.card_giftcard, color: Colors.orange),
+                    title: Row(
+                      children: [
+                        Text(code, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        if (!isActive)
+                          const Padding(
+                            padding: EdgeInsets.only(left: 8.0),
+                            child: Chip(
+                              label: Text('Vô hiệu hóa', style: TextStyle(fontSize: 10, color: Colors.white)),
+                              backgroundColor: Colors.red,
+                              padding: EdgeInsets.zero,
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                      ],
+                    ),
+                    subtitle: Text('Giảm: ${coupon['discount']} VNĐ\nSử dụng: ${coupon['used_count']} / ${coupon['max_usage']}'),
+                    isThreeLine: true,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Switch(
+                          value: isActive,
+                          onChanged: (value) async {
+                            await _fb.toggleCouponStatus(code, value);
+                            _loadCoupons();
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Colors.red),
+                          onPressed: () => _confirmDelete(code),
+                        ),
+                      ],
+                    ),
+                  ),
                 );
               },
             ),

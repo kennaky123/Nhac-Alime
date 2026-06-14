@@ -1,7 +1,8 @@
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:palette_generator/palette_generator.dart';
 import 'package:rxdart/rxdart.dart';
 import '../../data/model/song.dart';
 import 'dart:async';
@@ -10,14 +11,50 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../data/youtube_service.dart';
 
 class AudioPlayerManager {
-  AudioPlayerManager._internal();
+  AudioPlayerManager._internal() {
+    // KHÔNG dùng pipeline ngay từ đầu để đảm bảo có tiếng 100%
+    player = AudioPlayer();
+    _equalizer = AndroidEqualizer();
+    player.setVolume(1.0);
+  }
   static final AudioPlayerManager _instance = AudioPlayerManager._internal();
   factory AudioPlayerManager() => _instance;
 
-  final player = AudioPlayer();
+  late AudioPlayer player;
+  late final AndroidEqualizer _equalizer;
+  bool _isEqualizerSupported = false; // Cờ đánh dấu đã init pipeline hay chưa
+  AndroidEqualizer get equalizer => _equalizer;
+
+  /// Hàm này sẽ "nâng cấp" trình phát nhạc để sử dụng Equalizer khi cần
+  Future<void> enableEqualizerSupport() async {
+    if (_isEqualizerSupported) return;
+
+    final currentPosition = player.position;
+    final wasPlaying = player.playing;
+    final currentUrl = songUrl;
+    final currentSong = currentSongNotifier.value;
+
+    // Giải phóng player cũ
+    await player.dispose();
+
+    // Tạo player mới có hỗ trợ Equalizer
+    final pipeline = AudioPipeline(androidAudioEffects: [_equalizer]);
+    player = AudioPlayer(audioPipeline: pipeline);
+    _isEqualizerSupported = true;
+    
+    // Khôi phục trạng thái
+    if (currentUrl.isNotEmpty) {
+      updateSongUrl(currentUrl, song: currentSong);
+      await player.seek(currentPosition);
+      if (wasPlaying) player.play();
+    }
+  }
   Stream<DurationState>? durationState;
   String songUrl = "";
   bool isSmartShuffle = false;
+
+  // Báo hiệu màu sắc mới khi chuyển bài
+  final ValueNotifier<ColorScheme?> currentColorSchemeNotifier = ValueNotifier<ColorScheme?>(null);
 
   // Báo hiệu bài hát đang phát cho Mini Player
   final ValueNotifier<Song?> currentSongNotifier = ValueNotifier<Song?>(null);
@@ -121,6 +158,7 @@ class AudioPlayerManager {
   void updateSongUrl(String url, {Song? song}) async {
     if (song != null) {
       currentSongNotifier.value = song;
+      _updatePalette(song.image);
     }
 
     songUrl = url;
@@ -183,6 +221,30 @@ class AudioPlayerManager {
   void stopMusic() {
     player.stop();
     currentSongNotifier.value = null;
+    currentColorSchemeNotifier.value = null;
+  }
+
+  Future<void> _updatePalette(String imageUrl) async {
+    if (imageUrl.isEmpty) {
+      currentColorSchemeNotifier.value = null;
+      return;
+    }
+    try {
+      final PaletteGenerator paletteGenerator = await PaletteGenerator.fromImageProvider(
+        NetworkImage(imageUrl),
+        size: const Size(200, 200), // Kích thước nhỏ để xử lý nhanh hơn
+      ).timeout(const Duration(seconds: 3)); // Tránh treo quá lâu
+      
+      final Color primaryColor = paletteGenerator.dominantColor?.color ?? Colors.blue;
+      
+      currentColorSchemeNotifier.value = ColorScheme.fromSeed(
+        seedColor: primaryColor,
+        brightness: Brightness.dark, // Mặc định dark cho Now Playing screen
+      );
+    } catch (e) {
+      debugPrint("❌ Lỗi trích xuất màu: $e");
+      currentColorSchemeNotifier.value = null;
+    }
   }
 
   void dispose(){

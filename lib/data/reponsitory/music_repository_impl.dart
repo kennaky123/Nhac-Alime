@@ -181,4 +181,68 @@ class MusicRepositoryImpl implements Repository {
     if (userId.isEmpty) return [];
     return await _fb.getPlayHistory(userId);
   }
+
+  @override
+  Future<List<Song>> getSmartRecommendations(String userId) async {
+    // 1. Lấy toàn bộ bài hát khả dụng cho user
+    final allAvailableSongs = await fetchSongs(userId);
+    if (userId.isEmpty) {
+      allAvailableSongs.shuffle();
+      return allAvailableSongs.take(10).toList();
+    }
+
+    // 2. Lấy lịch sử nghe nhạc
+    final history = await _fb.getPlayHistory(userId);
+    if (history.isEmpty) {
+      allAvailableSongs.shuffle();
+      return allAvailableSongs.take(10).toList();
+    }
+
+    // 3. Phân tích sở thích (Nghệ sĩ nghe nhiều nhất)
+    Map<String, int> artistWeights = {};
+    for (var h in history) {
+      String artist = h['artist'] ?? '';
+      if (artist.isNotEmpty) {
+        artistWeights[artist] = (artistWeights[artist] ?? 0) + 1;
+      }
+    }
+
+    // Sắp xếp nghệ sĩ theo trọng số
+    var sortedArtists = artistWeights.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    
+    final topArtists = sortedArtists.take(3).map((e) => e.key).toList();
+
+    // 4. Lọc bài hát dựa trên nghệ sĩ yêu thích nhưng chưa nghe quá nhiều gần đây
+    List<Song> recommended = allAvailableSongs.where((song) {
+      // Ưu tiên bài của top artist
+      bool isFromTopArtist = topArtists.contains(song.artist);
+      // Kiểm tra xem bài này có trong lịch sử gần đây chưa (ví dụ 5 bài gần nhất)
+      bool playedRecently = history.take(5).any((h) => h['id'] == song.id);
+      
+      return isFromTopArtist && !playedRecently;
+    }).toList();
+
+    // 5. Nếu ít quá thì thêm nhạc xu hướng hoặc ngẫu nhiên
+    if (recommended.length < 5) {
+      final trending = await getTrendingSongs(userId);
+      for (var t in trending) {
+        if (!recommended.any((r) => r.id == t['id'])) {
+          recommended.add(Song(
+            id: t['id'],
+            title: t['title'] ?? '',
+            album: t['album'] ?? '',
+            artist: t['artist'] ?? '',
+            source: t['source'] ?? '',
+            image: t['image'] ?? '',
+            duration: t['duration'] ?? 240,
+          ));
+        }
+        if (recommended.length >= 10) break;
+      }
+    }
+
+    recommended.shuffle();
+    return recommended.take(10).toList();
+  }
 }

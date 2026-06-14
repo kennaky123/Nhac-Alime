@@ -44,6 +44,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> with SingleTickerProvid
   late LoopMode _loopMode;
   bool _isShuffle = false;
   bool _isPremium = true; // Mặc định là true để không hiện quảng cáo khi đang load
+  ColorScheme? _dynamicColorScheme;
 
   @override
   void initState(){
@@ -71,6 +72,17 @@ class _NowPlayingPageState extends State<NowPlayingPage> with SingleTickerProvid
 
     _selectedItemIndex = widget.songs.indexOf(widget.playingSong);
     _loopMode = LoopMode.off;
+
+    // Lắng nghe thay đổi màu sắc
+    _audioPlayerManager.currentColorSchemeNotifier.addListener(_onColorSchemeChanged);
+  }
+
+  void _onColorSchemeChanged() {
+    if (mounted) {
+      setState(() {
+        _dynamicColorScheme = _audioPlayerManager.currentColorSchemeNotifier.value;
+      });
+    }
   }
 
   Future<void> _checkPremium() async {
@@ -106,6 +118,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> with SingleTickerProvid
   @override
   void dispose() {
     _imageAnimController.dispose();
+    _audioPlayerManager.currentColorSchemeNotifier.removeListener(_onColorSchemeChanged);
     _audioPlayerManager.isNowPlayingOpen.value = false; // Đánh dấu là đã đóng trang phát nhạc
     super.dispose();
   }
@@ -113,7 +126,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = _dynamicColorScheme ?? Theme.of(context).colorScheme;
     const delta = 64;
     final radius = (screenWidth - delta) / 2;
 
@@ -129,7 +142,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> with SingleTickerProvid
         title: Column(
           children: [
             Text('PLAYING FROM ALBUM', 
-              style: TextStyle(fontSize: 10, letterSpacing: 1.5, color: colorScheme.onSurface.withOpacity(0.5))),
+              style: TextStyle(fontSize: 10, letterSpacing: 1.5, color: colorScheme.onSurface.withValues(alpha: 0.5))),
             Text(_song.album, 
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
           ],
@@ -144,7 +157,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> with SingleTickerProvid
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              colorScheme.primary.withOpacity(0.2),
+              colorScheme.primary.withValues(alpha: 0.2),
               colorScheme.surface,
             ],
           ),
@@ -162,7 +175,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> with SingleTickerProvid
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: colorScheme.primary.withOpacity(0.3),
+                        color: colorScheme.primary.withValues(alpha: 0.3),
                         blurRadius: 40,
                         spreadRadius: 5,
                       )
@@ -308,11 +321,11 @@ class _NowPlayingPageState extends State<NowPlayingPage> with SingleTickerProvid
           total: total,
           onSeek: _audioPlayerManager.player.seek,
           barHeight: 6.0,
-          baseBarColor: colorScheme.primary.withOpacity(0.1),
+          baseBarColor: colorScheme.primary.withValues(alpha: 0.1),
           progressBarColor: colorScheme.primary,
           thumbColor: colorScheme.primary,
           thumbRadius: 8,
-          timeLabelTextStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.5), fontWeight: FontWeight.bold),
+          timeLabelTextStyle: TextStyle(color: colorScheme.onSurface.withValues(alpha: 0.5), fontWeight: FontWeight.bold),
         );
       },
     );
@@ -340,7 +353,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> with SingleTickerProvid
             color: colorScheme.primary,
             boxShadow: [
               BoxShadow(
-                color: colorScheme.primary.withOpacity(0.3),
+                color: colorScheme.primary.withValues(alpha: 0.3),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               )

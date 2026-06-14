@@ -1,5 +1,8 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import '../../data/reponsitory/repository.dart'; // Chỉnh lại đường dẫn import file repository của bạn cho đúng nhé
+import '../../data/reponsitory/repository.dart';
+import '../../data/model/song.dart';
+import '../now_playing/playing.dart';
 
 class DiscoveryScreen extends StatefulWidget {
   final Repository repository;
@@ -12,7 +15,7 @@ class DiscoveryScreen extends StatefulWidget {
 }
 
 class _DiscoveryScreenState extends State<DiscoveryScreen> {
-  List<Map<String, dynamic>> recommendedSongs = [];
+  List<Song> recommendedSongs = [];
   List<Map<String, dynamic>> trendingSongs = [];
   bool isLoading = true;
 
@@ -25,7 +28,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   // Hàm gọi dữ liệu từ Repository
   Future<void> _fetchData() async {
     try {
-      final recommended = await widget.repository.getRecommendedSongs(widget.userId);
+      final recommended = await widget.repository.getSmartRecommendations(widget.userId);
       final trending = await widget.repository.getTrendingSongs(widget.userId);
 
       setState(() {
@@ -106,42 +109,55 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   }
 
   // Widget vẽ Card cho bài hát cuộn ngang (Có load ảnh từ mạng)
-  Widget _buildSongCard(Map<String, dynamic> song) {
-    return Container(
-      width: 140,
-      margin: const EdgeInsets.symmetric(horizontal: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: SizedBox(
-              height: 140,
-              width: 140,
-              child: Image.network(
-                song['image'] ?? '',
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  color: Colors.grey.shade300,
-                  child: const Icon(Icons.music_note, size: 50, color: Colors.grey),
+  Widget _buildSongCard(Song song) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          CupertinoPageRoute(
+            builder: (context) => NowPlaying(songs: recommendedSongs, playingSong: song),
+          ),
+        );
+      },
+      child: Container(
+        width: 140,
+        margin: const EdgeInsets.symmetric(horizontal: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: SizedBox(
+                height: 140,
+                width: 140,
+                child: Hero(
+                  tag: 'song_art_${song.id}',
+                  child: Image.network(
+                    song.image,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: Colors.grey.shade300,
+                      child: const Icon(Icons.music_note, size: 50, color: Colors.grey),
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            song['title'] ?? 'Unknown',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(
-            song['artist'] ?? 'Unknown',
-            style: const TextStyle(color: Colors.grey, fontSize: 14),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              song.title,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              song.artist,
+              style: const TextStyle(color: Colors.grey, fontSize: 14),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -191,7 +207,32 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       ),
       trailing: const Icon(Icons.more_vert),
       onTap: () {
-        // Xử lý khi bấm vào bài hát (VD: Mở màn hình phát nhạc)
+        final selectedSong = Song(
+          id: song['id'],
+          title: song['title'] ?? '',
+          album: song['album'] ?? '',
+          artist: song['artist'] ?? '',
+          source: song['source'] ?? '',
+          image: song['image'] ?? '',
+          duration: song['duration'] ?? 240,
+        );
+        Navigator.push(
+          context,
+          CupertinoPageRoute(
+            builder: (context) => NowPlaying(
+              songs: trendingSongs.map((s) => Song(
+                id: s['id'],
+                title: s['title'] ?? '',
+                album: s['album'] ?? '',
+                artist: s['artist'] ?? '',
+                source: s['source'] ?? '',
+                image: s['image'] ?? '',
+                duration: s['duration'] ?? 240,
+              )).toList(), 
+              playingSong: selectedSong
+            ),
+          ),
+        );
       },
     );
   }

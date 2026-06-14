@@ -9,6 +9,7 @@ import '../../data/reponsitory/music_repository_impl.dart';
 import '../../data/playlist_event_bus.dart';
 import '../../main.dart'; // ĐẢM BẢO IMPORT ĐÚNG FILE CHỨA CLASS MusicApp
 import '../setting/premium_screen.dart';
+import '../setting/equalizer_screen.dart';
 import 'playlist_detail.dart';
 
 class AccountTab extends StatefulWidget {
@@ -672,6 +673,28 @@ class _AccountTabState extends State<AccountTab> {
 
                   // PHẦN BẢNG TIN (BẠN BÈ)
                   _buildFriendsFeedSection(),
+
+                  const Divider(),
+
+                  // PHẦN CÀI ĐẶT BỔ SUNG
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.equalizer_rounded, color: Colors.blue),
+                          title: const Text('Bộ chỉnh âm (Equalizer)', style: TextStyle(fontWeight: FontWeight.bold)),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const EqualizerScreen()),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
 
                   const Divider(),
 

@@ -399,7 +399,16 @@ class FirebaseService {
       'discount': discount,
       'max_usage': maxUsage,
       'used_count': 0,
+      'is_active': true,
     });
+  }
+
+  Future<void> deleteCoupon(String code) async {
+    await _firestore.collection('coupons').doc(code).delete();
+  }
+
+  Future<void> toggleCouponStatus(String code, bool isActive) async {
+    await _firestore.collection('coupons').doc(code).update({'is_active': isActive});
   }
 
   Future<List<Map<String, dynamic>>> getAllCoupons() async {
@@ -411,7 +420,8 @@ class FirebaseService {
     DocumentSnapshot doc = await _firestore.collection('coupons').doc(code).get();
     if (doc.exists) {
       var data = doc.data() as Map<String, dynamic>;
-      if (data['used_count'] < data['max_usage']) {
+      bool isActive = data['is_active'] ?? true;
+      if (isActive && data['used_count'] < data['max_usage']) {
         return data;
       }
     }
@@ -784,5 +794,49 @@ class FirebaseService {
       'total_plays': history.docs.length,
       'top_songs': topSongDisplayNames,
     };
+  }
+
+  Future<List<Map<String, dynamic>>> getGlobalTopSongs() async {
+    QuerySnapshot history = await _firestore.collection('play_history').get();
+    
+    Map<String, int> songCounts = {};
+    Map<String, Map<String, dynamic>> songDetails = {};
+
+    for (var doc in history.docs) {
+      String songId = doc.get('song_id');
+      songCounts[songId] = (songCounts[songId] ?? 0) + 1;
+      
+      var data = doc.data() as Map<String, dynamic>;
+      if (!songDetails.containsKey(songId) && data['song_title'] != null) {
+        songDetails[songId] = {
+          'id': songId,
+          'title': data['song_title'],
+          'artist': data['artist'],
+          'image': data['image'],
+        };
+      }
+    }
+    
+    var sortedEntries = songCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    
+    List<Map<String, dynamic>> topSongs = [];
+    for (var entry in sortedEntries.take(20)) {
+      Map<String, dynamic> data;
+      if (songDetails.containsKey(entry.key)) {
+        data = Map<String, dynamic>.from(songDetails[entry.key]!);
+      } else {
+        DocumentSnapshot songDoc = await _firestore.collection('songs').doc(entry.key).get();
+        if (songDoc.exists) {
+          data = songDoc.data() as Map<String, dynamic>;
+          data['id'] = songDoc.id;
+        } else {
+          data = {'id': entry.key, 'title': 'Unknown Song'};
+        }
+      }
+      data['play_count'] = entry.value;
+      topSongs.add(data);
+    }
+    return topSongs;
   }
 }

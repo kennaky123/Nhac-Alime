@@ -25,4 +25,7 @@ abstract class Repository {
   Future<void> respondToInvitation(String notificationId, bool accept);
   Future<void> deleteNotification(String notificationId);
   Future<List<Map<String, dynamic>>> getPlayHistory(String userId);
+
+  // --- Smart Recommendations ---
+  Future<List<Song>> getSmartRecommendations(String userId);
 }
