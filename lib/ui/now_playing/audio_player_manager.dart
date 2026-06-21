@@ -67,6 +67,8 @@ class AudioPlayerManager {
   int currentIndex = 0;
 
   Timer? _sleepTimer;
+  Timer? _countdownTimer;
+  final ValueNotifier<Duration?> sleepTimerRemainingNotifier = ValueNotifier<Duration?>(null);
 
   void initAutoNext() {
     player.playerStateStream.listen((state) {
@@ -78,16 +80,35 @@ class AudioPlayerManager {
 
   void setSleepTimer(Duration? duration) {
     _sleepTimer?.cancel();
+    _countdownTimer?.cancel();
+    sleepTimerRemainingNotifier.value = duration;
 
     if (duration != null) {
       _sleepTimer = Timer(duration, () {
         player.pause();
+        cancelSleepTimer();
+      });
+
+      _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (sleepTimerRemainingNotifier.value != null) {
+          final remaining = sleepTimerRemainingNotifier.value! - const Duration(seconds: 1);
+          if (remaining.isNegative) {
+            timer.cancel();
+            sleepTimerRemainingNotifier.value = null;
+          } else {
+            sleepTimerRemainingNotifier.value = remaining;
+          }
+        } else {
+          timer.cancel();
+        }
       });
     }
   }
 
   void cancelSleepTimer() {
     _sleepTimer?.cancel();
+    _countdownTimer?.cancel();
+    sleepTimerRemainingNotifier.value = null;
   }
 
   Future<void> prepare({bool isNewSong = false}) async {
@@ -248,6 +269,7 @@ class AudioPlayerManager {
   }
 
   void dispose(){
+    cancelSleepTimer();
     player.dispose();
   }
 }

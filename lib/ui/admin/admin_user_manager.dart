@@ -28,6 +28,32 @@ class _AdminUserManagerScreenState extends State<AdminUserManagerScreen> {
     });
   }
 
+  Future<void> _confirmDelete(String userId, String username) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xác nhận xóa'),
+        content: Text('Bạn có chắc chắn muốn xóa người dùng "$username" khỏi hệ thống không? Hành động này không thể hoàn tác.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Hủy')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Xóa', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await _fb.deleteUser(userId);
+      _loadUsers();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã xóa người dùng thành công')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -50,17 +76,26 @@ class _AdminUserManagerScreenState extends State<AdminUserManagerScreen> {
                     onSelected: (value) async {
                       if (value == 'toggle_premium') {
                         await _fb.updatePremiumStatus(user['uid'], !isPremium);
+                        _loadUsers();
                       } else if (value == 'make_admin') {
                         await _fb.updateUserRole(user['uid'], 'admin');
+                        _loadUsers();
                       } else if (value == 'make_user') {
                         await _fb.updateUserRole(user['uid'], 'user');
+                        _loadUsers();
+                      } else if (value == 'delete_user') {
+                        _confirmDelete(user['uid'], user['username'] ?? 'No name');
                       }
-                      _loadUsers();
                     },
                     itemBuilder: (context) => [
                       PopupMenuItem(value: 'toggle_premium', child: Text(isPremium ? 'Remove Premium' : 'Grant Premium')),
                       if (role == 'user') const PopupMenuItem(value: 'make_admin', child: Text('Make Admin')),
                       if (role == 'admin') const PopupMenuItem(value: 'make_user', child: Text('Revoke Admin')),
+                      const PopupMenuDivider(),
+                      const PopupMenuItem(
+                        value: 'delete_user',
+                        child: Text('Delete User', style: TextStyle(color: Colors.red)),
+                      ),
                     ],
                   ),
                 );

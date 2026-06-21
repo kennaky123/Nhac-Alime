@@ -13,6 +13,7 @@ import 'dart:async';
 import 'package:music_app/ui/user/login.dart';
 import '../history/history_screen.dart';
 import 'gemini_search_screen.dart';
+import '../setting/settings.dart';
 
 // ==========================================
 // MÀN HÌNH CHÍNH (Chứa thanh điều hướng Bottom Navigation)
@@ -815,109 +816,6 @@ class MiniPlayer extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ==========================================
-// CÁC TAB KHÁC (Settings)
-// ==========================================
-
-class SettingsTab extends StatefulWidget {
-  const SettingsTab({super.key});
-
-  @override
-  State<SettingsTab> createState() => _SettingsTabState();
-}
-
-class _SettingsTabState extends State<SettingsTab> {
-  bool _isDarkMode = themeNotifier.value == ThemeMode.dark;
-  String _sleepTimerText = "Tắt";
-
-  void _showSleepTimerDialog() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Hẹn giờ tắt nhạc', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ListTile(title: const Text('Tắt'), onTap: () => _setTimer("Tắt")),
-            ListTile(title: const Text('Sau 1 phút'), onTap: () => _setTimer("1 phút")),
-            ListTile(title: const Text('Sau 30 phút'), onTap: () => _setTimer("30 phút")),
-            ListTile(title: const Text('Sau 60 phút'), onTap: () => _setTimer("60 phút")),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _setTimer(String value) {
-    setState(() => _sleepTimerText = value);
-    Navigator.pop(context);
-    Duration? duration;
-    if (value == "1 phút") duration = const Duration(minutes: 1);
-    else if (value == "30 phút") duration = const Duration(minutes: 30);
-    else if (value == "60 phút") duration = const Duration(minutes: 60);
-
-    AudioPlayerManager().setSleepTimer(duration);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Đã hẹn giờ tắt: $value')));
-  }
-
-  void _logout() {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Đăng xuất'),
-        content: const Text('Bạn có chắc chắn muốn thoát không?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Hủy')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Thoát', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Cài đặt', style: TextStyle(fontWeight: FontWeight.bold)), centerTitle: true),
-      body: ListView(
-        children: [
-          SwitchListTile(
-            secondary: Icon(_isDarkMode ? Icons.dark_mode : Icons.light_mode, color: _isDarkMode ? Colors.orange : Colors.blue),
-            title: const Text('Chế độ tối'),
-            value: _isDarkMode,
-            onChanged: (bool value) {
-              setState(() => _isDarkMode = value);
-              themeNotifier.value = value ? ThemeMode.dark : ThemeMode.light;
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.timer_outlined, color: Colors.green),
-            title: const Text('Hẹn giờ tắt nhạc'),
-            trailing: Text(_sleepTimerText, style: const TextStyle(color: Colors.grey)),
-            onTap: _showSleepTimerDialog,
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text('Đăng xuất', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-            onTap: _logout,
-          ),
-        ],
       ),
     );
   }

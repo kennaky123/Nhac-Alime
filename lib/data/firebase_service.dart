@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
+import 'package:intl/intl.dart';
 
 class FirebaseService {
   static final FirebaseService instance = FirebaseService._init();
@@ -457,9 +458,126 @@ class FirebaseService {
     // 1. Update request status
     await _firestore.collection('premium_requests').doc(userId).update({
       'status': 'approved',
+      'approvedAt': FieldValue.serverTimestamp(), // Add timestamp for sales tracking
     });
     // 2. Update user status
     await updatePremiumStatus(userId, true);
+  }
+
+  /// Get premium sales data grouped by date for the chart
+  Future<Map<String, int>> getPremiumSalesData() async {
+    final snapshot = await _firestore
+        .collection('premium_requests')
+        .where('status', isEqualTo: 'approved')
+        .orderBy('approvedAt')
+        .get();
+
+    final Map<String, int> salesData = {};
+    final DateFormat formatter = DateFormat('dd/MM');
+
+    for (var doc in snapshot.docs) {
+      final timestamp = doc.get('approvedAt');
+      if (timestamp != null && timestamp is Timestamp) {
+        final dateStr = formatter.format(timestamp.toDate());
+        salesData[dateStr] = (salesData[dateStr] ?? 0) + 1;
+      }
+    }
+    return salesData;
+  }
+
+  Future<void> rejectPremiumRequest(String userId) async {
+    await _firestore.collection('premium_requests').doc(userId).update({
+      'status': 'rejected',
+    });
+  }
+
+  // --- CHAT SYSTEM ---
+
+  /// Send a message (works for both user and admin)
+  Future<void> sendMessage(String chatId, String senderId, String text, {bool isAdmin = false}) async {
+    final messageData = {
+      'senderId': senderId,
+      'text': text,
+      'timestamp': FieldValue.serverTimestamp(),
+      'isAdmin': isAdmin,
+    };
+
+    // 1. Add message to the subcollection
+    await _firestore.collection('chats').doc(chatId).collection('messages').add(messageData);
+
+    // 2. Update the chat document with metadata for the list view
+    await _firestore.collection('chats').doc(chatId).set({
+      'lastMessage': text,
+      'lastMessageTimestamp': FieldValue.serverTimestamp(),
+      'chatId': chatId, // This is the userId
+      'hasNewMessage': !isAdmin, // Only show "new" if it's from a user
+    }, SetOptions(merge: true));
+  }
+
+  /// Get real-time messages for a specific chat
+  Stream<QuerySnapshot> getMessages(String chatId) {
+    return _firestore
+        .collection('chats')
+        .doc(chatId)
+        .collection('messages')
+        .orderBy('timestamp', descending: true)
+        .snapshots();
+  }
+
+  /// Get the list of active chats (for admin)
+  Stream<QuerySnapshot> getActiveChats() {
+    return _firestore
+        .collection('chats')
+        .orderBy('lastMessageTimestamp', descending: true)
+        .snapshots();
+  }
+
+  /// Get counts for premium vs regular users
+  Future<Map<String, int>> getPremiumUserStats() async {
+    final querySnapshot = await _firestore.collection('users').get();
+    int premium = 0;
+    int regular = 0;
+
+    for (var doc in querySnapshot.docs) {
+      final data = doc.data();
+      if (data['isPremium'] == true) {
+        premium++;
+      } else {
+        regular++;
+      }
+    }
+
+    return {
+      'premium': premium,
+      'regular': regular,
+    };
+  }
+
+  /// Mark a chat as read (for admin)
+  Future<void> markChatAsRead(String chatId) async {
+    await _firestore.collection('chats').doc(chatId).update({
+      'hasNewMessage': false,
+    });
+  }
+
+  /// Delete a user from Firestore (Admin only)
+  Future<void> deleteUser(String userId) async {
+    // 1. Delete user document from 'users' collection
+    await _firestore.collection('users').doc(userId).delete();
+    
+    // 2. Optional: Delete related data like premium requests
+    await _firestore.collection('premium_requests').doc(userId).delete();
+    
+    // 3. Optional: Delete chat data if exists
+    final chatDoc = await _firestore.collection('chats').doc(userId).get();
+    if (chatDoc.exists) {
+      // Delete messages subcollection first
+      final messages = await _firestore.collection('chats').doc(userId).collection('messages').get();
+      for (var doc in messages.docs) {
+        await doc.reference.delete();
+      }
+      await _firestore.collection('chats').doc(userId).delete();
+    }
   }
 
   Future<bool> hasPendingPremiumRequest(String userId) async {

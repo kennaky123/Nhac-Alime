@@ -11,6 +11,7 @@ import '../../main.dart'; // ĐẢM BẢO IMPORT ĐÚNG FILE CHỨA CLASS MusicA
 import '../setting/premium_screen.dart';
 import '../setting/equalizer_screen.dart';
 import 'playlist_detail.dart';
+import 'chat_screen.dart';
 
 class AccountTab extends StatefulWidget {
   final String userId;
@@ -636,7 +637,17 @@ class _AccountTabState extends State<AccountTab> {
                               const Text('Người yêu nhạc', style: TextStyle(color: Colors.grey)),
                             ],
                           ),
-                        )
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.chat_bubble_outline, color: Colors.blue),
+                          onPressed: () {
+                            Navigator.of(context, rootNavigator: true).push(
+                              MaterialPageRoute(
+                                builder: (context) => ChatScreen(userId: widget.userId),
+                              ),
+                            );
+                          },
+                        ),
                       ],
                     ),
                   ),
